@@ -249,17 +249,6 @@ function LoginScreen({ onLogin }) {
             </div>
           </div>
         </div>
-
-        {/* Demo Info */}
-        <div className="text-center text-xs text-gray-500 bg-gray-800 p-3 rounded">
-          <p>
-            🔒 This is a demonstration system using WebGL for maps and mock data.
-          </p>
-          <p className="mt-2">
-            For real emergencies, call:
-            <span className="text-white font-bold"> 911 or Local Emergency Services</span>
-          </p>
-        </div>
       </div>
     </div>
   );

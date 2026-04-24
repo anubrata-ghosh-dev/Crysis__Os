@@ -26,7 +26,7 @@ const FULL_NAME_REGEX = /^[A-Za-z][A-Za-z' -]{1,}\s+[A-Za-z][A-Za-z' -]{1,}$/;
 const getRandomInRange = (min, max) => Math.random() * (max - min) + min;
 
 export const IncidentForm = ({ onSubmit = () => {}, onClose = () => {}, isDarkMode = false }) => {
-  const { location, getCurrentPosition } = useLocation();
+  const { location, getCurrentPosition, error: locationError, isLoading: isLocationLoading, permissionStatus, checkPermission } = useLocation();
   const [formData, setFormData] = useState({
     type: "",
     severity: "",
@@ -40,6 +40,7 @@ export const IncidentForm = ({ onSubmit = () => {}, onClose = () => {}, isDarkMo
   const [useCurrentLocation, setUseCurrentLocation] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [locationMode, setLocationMode] = useState("current");
+  const [showDebug, setShowDebug] = useState(false);
   const lastDemoLocationRef = useRef(null);
 
   const isValidPhone = PHONE_REGEX.test(formData.phoneNumber.trim());
@@ -52,6 +53,14 @@ export const IncidentForm = ({ onSubmit = () => {}, onClose = () => {}, isDarkMo
       setLocationMode("current");
     }
   }, [location, useCurrentLocation]);
+
+  // Request current location when the form mounts.
+  useEffect(() => {
+    if (useCurrentLocation) {
+      getCurrentPosition();
+      checkPermission();
+    }
+  }, [useCurrentLocation, getCurrentPosition, checkPermission]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -261,15 +270,25 @@ export const IncidentForm = ({ onSubmit = () => {}, onClose = () => {}, isDarkMo
               <span
                 className="text-sm font-bold px-3 py-1 rounded-full transition-colors"
                 style={{
-                  backgroundColor: selectedLocation
+                  backgroundColor: isLocationLoading
+                    ? (isDarkMode ? "#1e3a8a" : "#dbeafe")
+                    : selectedLocation
                     ? (locationMode === "demo" ? (isDarkMode ? "#172554" : "#dbeafe") : (isDarkMode ? "#064e3b" : "#dcfce7"))
                     : (isDarkMode ? "#78350f" : "#fef3c7"),
-                  color: selectedLocation
+                  color: isLocationLoading
+                    ? (isDarkMode ? "#93c5fd" : "#1d4ed8")
+                    : selectedLocation
                     ? (locationMode === "demo" ? (isDarkMode ? "#93c5fd" : "#1d4ed8") : (isDarkMode ? "#86efac" : "#166534"))
                     : (isDarkMode ? "#fcd34d" : "#b45309")
                 }}
               >
-                {selectedLocation ? (locationMode === "demo" ? "✓ DEMO LOCATION" : "✓ DETECTED") : "⚠ DEFAULT"}
+                {isLocationLoading
+                  ? "⌛ DETECTING"
+                  : selectedLocation
+                    ? (locationMode === "demo"
+                      ? "✓ DEMO LOCATION"
+                      : (selectedLocation.isDefault ? "⚠ DEFAULT" : "✓ DETECTED"))
+                    : "⚠ DEFAULT"}
               </span>
             </div>
             
@@ -293,6 +312,16 @@ export const IncidentForm = ({ onSubmit = () => {}, onClose = () => {}, isDarkMo
                 {locationMode === "demo" && (
                   <p className="text-xs" style={{ color: isDarkMode ? "#93c5fd" : "#1d4ed8" }}>
                     🎲 Demo location generated inside Durgapur-Asansol.
+                  </p>
+                )}
+                {locationMode === "current" && selectedLocation.isDefault && (
+                  <p className="text-xs" style={{ color: isDarkMode ? "#fbbf24" : "#b45309" }}>
+                    Using fallback location. Tap "Update Current Location" and allow GPS for exact coordinates.
+                  </p>
+                )}
+                {locationMode === "current" && locationError && (
+                  <p className="text-xs" style={{ color: isDarkMode ? "#fca5a5" : "#dc2626" }}>
+                    Location error: {locationError}
                   </p>
                 )}
               </div>
@@ -324,7 +353,7 @@ export const IncidentForm = ({ onSubmit = () => {}, onClose = () => {}, isDarkMo
                 onClick={handleGetLocation}
                 className="w-full"
               >
-                🔄 {useCurrentLocation ? "Update" : "Use"} Current Location
+                🔄 {isLocationLoading ? "Detecting..." : (useCurrentLocation ? "Update" : "Use")} Current Location
               </Button>
               <Button
                 type="button"
@@ -336,6 +365,79 @@ export const IncidentForm = ({ onSubmit = () => {}, onClose = () => {}, isDarkMo
                 🎲 Demo Location
               </Button>
             </div>
+          </div>
+
+          {/* DEBUG PANEL - Location Diagnostics */}
+          <div
+            className="p-4 rounded-lg border-2 transition-colors"
+            style={{
+              backgroundColor: isDarkMode ? "#0f172a" : "#f8fafc",
+              borderColor: isDarkMode ? "#334155" : "#cbd5e1"
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setShowDebug(!showDebug)}
+              className="text-sm font-bold mb-2 hover:underline"
+              style={{ color: isDarkMode ? "#94a3b8" : "#64748b" }}
+            >
+              {showDebug ? "▼" : "▶"} Geolocation Debug Info
+            </button>
+
+            {showDebug && (
+              <div className="space-y-2 text-xs mt-3 border-t pt-3" style={{ borderColor: isDarkMode ? "#334155" : "#cbd5e1" }}>
+                <p style={{ color: isDarkMode ? "#cbd5e1" : "#475569" }}>
+                  <span className="font-bold">Permission Status:</span>{" "}
+                  <span style={{
+                    color: permissionStatus === "granted" ? "#22c55e" : permissionStatus === "denied" ? "#ef4444" : "#f59e0b"
+                  }}>
+                    {permissionStatus || "Checking..."}
+                  </span>
+                </p>
+                <p style={{ color: isDarkMode ? "#cbd5e1" : "#475569" }}>
+                  <span className="font-bold">Secure Context:</span>{" "}
+                  <span style={{ color: window.isSecureContext ? "#22c55e" : "#f59e0b" }}>
+                    {window.isSecureContext ? "✓ HTTPS" : "⚠ HTTP"}
+                  </span>
+                </p>
+                <p style={{ color: isDarkMode ? "#cbd5e1" : "#475569" }}>
+                  <span className="font-bold">Hostname:</span> {window.location.hostname}
+                </p>
+                <p style={{ color: isDarkMode ? "#cbd5e1" : "#475569" }}>
+                  <span className="font-bold">Current Location:</span>{" "}
+                  {location ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : "Not yet detected"}
+                </p>
+                {locationError && (
+                  <p style={{ color: "#ef4444" }}>
+                    <span className="font-bold">Error:</span> {locationError}
+                  </p>
+                )}
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      checkPermission();
+                      console.log("[DEBUG] Checking permission status...");
+                    }}
+                    className="flex-1"
+                  >
+                    Check Permission
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      console.log("[DEBUG] Manually requesting location...");
+                      getCurrentPosition();
+                    }}
+                    className="flex-1"
+                  >
+                    Request Location
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Incident Type */}
